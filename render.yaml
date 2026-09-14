@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: solana-arbitrage-paper-bot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT app:app
+    envVars:
+      - key: POLL_SECONDS
+        value: "5"
+      - key: STARTING_USDC
+        value: "1"
+      - key: TRADE_FRACTION
+        value: "0.10"
+      - key: MIN_NET_PROFIT_PCT
+        value: "0.10"
+      - key: PAPER_FEE_PCT
+        value: "0.30"
+      - key: PAPER_SLIPPAGE_PCT
+        value: "0.30"
