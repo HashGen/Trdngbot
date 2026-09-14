@@ -22,7 +22,7 @@ def num(key, default):
         return float(default)
 
 
-POLL = max(5, int(num("POLL_SECONDS", "10")))
+POLL = max(20, int(num("POLL_SECONDS", "30")))
 START = max(0.01, num("STARTING_USDC", "1"))
 FRACTION = min(1.0, max(0.01, num("TRADE_FRACTION", ".10")))
 MINP = num("MIN_NET_PROFIT_PCT", ".10")
@@ -60,30 +60,33 @@ def quote(input_mint, output_mint, amount_raw, dex):
         "swapMode": "ExactIn",
         "dexes": dex,
         "onlyDirectRoutes": "true",
-        "instructionVersion": "V2",
     }
 
-    last_error = None
-    for attempt in range(3):
-        try:
-            response = requests.get(
-                QUOTE,
-                params=params,
-                timeout=(4, 8),
-                headers={"Accept": "application/json"},
-            )
-            response.raise_for_status()
-            data = response.json()
-            if data.get("error"):
-                raise RuntimeError(str(data.get("error")))
-            return data
-        except Exception as exc:
-            last_error = exc
-            if attempt < 2:
-                time.sleep(0.5 * (attempt + 1))
+    # Keep requests deliberately gentle on the public Lite API.
+    # A 429 means rate-limited, so do not hammer the endpoint with retries.
+    time.sleep(0.35)
 
-    raise RuntimeError(str(last_error))
+    response = requests.get(
+        QUOTE,
+        params=params,
+        timeout=(5, 10),
+        headers={
+            "Accept": "application/json",
+            "User-Agent": "Solana-Arbitrage-Paper-Bot/1.0",
+        },
+    )
 
+    if response.status_code == 429:
+        retry_after = response.headers.get("Retry-After", "unknown")
+        raise RuntimeError(f"Jupiter rate limited (429), Retry-After={retry_after}")
+
+    response.raise_for_status()
+    data = response.json()
+
+    if data.get("error"):
+        raise RuntimeError(str(data.get("error")))
+
+    return data
 
 def buy_quote(dex, amount_usdc):
     try:
@@ -116,14 +119,12 @@ def scan():
     amount = min(PROBE, max(0.01, S["balance"] * FRACTION))
 
     buys = []
-    with ThreadPoolExecutor(max_workers=len(DEXES)) as pool:
-        futures = [pool.submit(buy_quote, dex, amount) for dex in DEXES]
-        for future in as_completed(futures):
-            result, error = future.result()
-            if result:
-                buys.append(result)
-            elif error:
-                log(error)
+    for dex in DEXES:
+        result, error = buy_quote(dex, amount)
+        if result:
+            buys.append(result)
+        elif error:
+            log(error)
 
     buys.sort(key=lambda item: item["sol"], reverse=True)
     if not buys:
@@ -131,12 +132,10 @@ def scan():
 
     jobs = [(buy, dex) for buy in buys for dex in DEXES if dex != buy["dex"]]
     sells = []
-    with ThreadPoolExecutor(max_workers=min(16, len(jobs))) as pool:
-        futures = [pool.submit(sell_quote, buy, dex) for buy, dex in jobs]
-        for future in as_completed(futures):
-            result = future.result()
-            if result:
-                sells.append(result)
+    for buy, dex in jobs:
+        result = sell_quote(buy, dex)
+        if result:
+            sells.append(result)
 
     if not sells:
         raise RuntimeError("No cross-DEX sell quotes returned")
