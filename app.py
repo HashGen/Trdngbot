@@ -1,5 +1,6 @@
 import os
 import time
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
@@ -95,7 +96,6 @@ def sell_quote(buy, dex):
 def scan():
     amount = min(PROBE, max(0.01, S["balance"] * FRACTION))
 
-    # Run buy quotes in parallel so one slow DEX cannot block the whole scan.
     buys = []
     with ThreadPoolExecutor(max_workers=len(DEXES)) as pool:
         futures = [pool.submit(buy_quote, dex, amount) for dex in DEXES]
@@ -110,8 +110,6 @@ def scan():
     if not buys:
         raise RuntimeError("No buy quotes returned")
 
-    # Only cross-DEX sells are considered. Selling on the same DEX is not
-    # an arbitrage route.
     jobs = [(buy, dex) for buy in buys for dex in DEXES if dex != buy["dex"]]
     sells = []
     with ThreadPoolExecutor(max_workers=min(16, len(jobs))) as pool:
@@ -165,6 +163,7 @@ def worker():
         if S["running"] and not S["scan_in_progress"]:
             S["scan_in_progress"] = True
             S["cycles"] += 1
+            log(f"Scan #{S['cycles']} started")
             try:
                 scan()
             except Exception as exc:
@@ -173,6 +172,33 @@ def worker():
             finally:
                 S["scan_in_progress"] = False
         time.sleep(POLL)
+
+
+_scanner_started = False
+_scanner_lock = threading.Lock()
+
+
+def ensure_scanner_started():
+    global _scanner_started
+    if _scanner_started:
+        return
+    with _scanner_lock:
+        if _scanner_started:
+            return
+        threading.Thread(
+            target=worker,
+            name="paper-scanner",
+            daemon=True,
+        ).start()
+        _scanner_started = True
+        log("Scanner launched inside web worker")
+
+
+@app.before_request
+def start_scanner_if_needed():
+    # Important for Gunicorn/Render: this starts the thread after the worker
+    # process exists, instead of starting it during the Gunicorn master import.
+    ensure_scanner_started()
 
 
 @app.get("/")
@@ -218,12 +244,6 @@ def reset():
     return jsonify({"ok": True})
 
 
-# One daemon thread is used because this Render service runs a single Gunicorn
-# worker. The scanner itself uses short parallel quote requests so it does not
-# sit blocked on 20 sequential network calls.
-import threading
-
-threading.Thread(target=worker, name="paper-scanner", daemon=True).start()
-
 if __name__ == "__main__":
+    ensure_scanner_started()
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", "10000")))
