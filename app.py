@@ -9,7 +9,7 @@ from flask import Flask, jsonify, render_template
 app = Flask(__name__)
 
 # Paper-only scanner. No wallet, signing or real transactions.
-QUOTE = "https://quote-api.jup.ag/v6/quote"
+QUOTE = "https://lite-api.jup.ag/swap/v1/quote"
 SOL = "So11111111111111111111111111111111111111112"
 USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
 DEXES = ["Raydium", "Orca Whirlpool", "Meteora DLMM", "Lifinity"]
@@ -60,10 +60,29 @@ def quote(input_mint, output_mint, amount_raw, dex):
         "swapMode": "ExactIn",
         "dexes": dex,
         "onlyDirectRoutes": "true",
+        "instructionVersion": "V2",
     }
-    response = requests.get(QUOTE, params=params, timeout=8)
-    response.raise_for_status()
-    return response.json()
+
+    last_error = None
+    for attempt in range(3):
+        try:
+            response = requests.get(
+                QUOTE,
+                params=params,
+                timeout=(4, 8),
+                headers={"Accept": "application/json"},
+            )
+            response.raise_for_status()
+            data = response.json()
+            if data.get("error"):
+                raise RuntimeError(str(data.get("error")))
+            return data
+        except Exception as exc:
+            last_error = exc
+            if attempt < 2:
+                time.sleep(0.5 * (attempt + 1))
+
+    raise RuntimeError(str(last_error))
 
 
 def buy_quote(dex, amount_usdc):
