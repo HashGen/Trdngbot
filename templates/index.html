@@ -1,47 +1,32 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Solana Arbitrage — Paper Bot</title>
+<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Solana Arbitrage Paper Bot v2</title>
 <style>
-body{font-family:system-ui,-apple-system,sans-serif;background:#0f1115;color:#eee;margin:0}
-.wrap{max-width:900px;margin:auto;padding:24px}
-.card{background:#181b22;border:1px solid #292e38;border-radius:18px;padding:20px;margin:14px 0}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
-.big{font-size:28px;font-weight:700}.muted{color:#9aa3b2}
-button{border:0;border-radius:12px;padding:12px 18px;background:#eee;color:#111;font-weight:700}
-.log{font-family:monospace;font-size:13px;line-height:1.7;white-space:pre-wrap}
-.warn{border-left:4px solid #e0a800}
-</style>
-</head>
-<body><div class="wrap">
-<h1>Solana Arbitrage — Paper Bot</h1>
-<p class="muted">Educational simulator • no real trades • no private key</p>
-<div class="card warn"><b>⚠️ Paper mode only.</b> This dashboard does not send transactions or spend crypto.</div>
-<div class="grid">
-<div class="card"><div class="muted">Virtual balance</div><div class="big" id="bal">—</div></div>
-<div class="card"><div class="muted">Paper P/L</div><div class="big" id="pnl">—</div></div>
-<div class="card"><div class="muted">Cycles</div><div class="big" id="cycles">—</div></div>
-<div class="card"><div class="muted">Status</div><div class="big" id="status">—</div></div>
-</div>
-<div class="card">
-<button onclick="toggle()">Start / Pause</button>
-<span id="last" class="muted" style="margin-left:12px"></span>
-</div>
-<div class="card"><h3>Activity</h3><div id="logs" class="log"></div></div>
-</div>
+body{font-family:system-ui;background:#0d0f13;color:#eee;margin:0}.w{max-width:900px;margin:auto;padding:18px}
+.c{background:#171a21;border:1px solid #292e38;border-radius:18px;padding:18px;margin:12px 0}
+.g{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}.m{color:#9ca3af}.b{font-size:26px;font-weight:800}
+button{padding:11px 16px;border:0;border-radius:12px;font-weight:800;margin-right:8px}
+.warn{border-left:4px solid #eab308}.log{font:12px monospace;white-space:pre-wrap;max-height:300px;overflow:auto}
+table{width:100%;border-collapse:collapse}td,th{padding:7px;border-bottom:1px solid #2a2e37;text-align:left}
+</style><div class=w><h1>Solana Arbitrage — Paper Bot</h1>
+<p class=m>v2 • virtual money only</p>
+<div class="c warn"><b>⚠️ PAPER MODE</b><br>No private key, wallet signing or real transactions.</div>
+<div class=g><div class=c><span class=m>Balance</span><div class=b id=b>$—</div></div>
+<div class=c><span class=m>P/L</span><div class=b id=p>$—</div></div>
+<div class=c><span class=m>Scans</span><div class=b id=c>—</div></div>
+<div class=c><span class=m>Paper trades</span><div class=b id=t>—</div></div></div>
+<div class=c><button onclick="tog()">Start / Pause</button><button onclick="res()">Reset $1</button> <span class=m id=s></span></div>
+<div class=c id=o>Waiting for first scan…</div>
+<div class=c><h3>Latest DEX quotes</h3><table><thead><tr><th>DEX</th><th>SOL</th><th>Impact</th></tr></thead><tbody id=q></tbody></table></div>
+<div class=c><h3>Activity</h3><div class=log id=l></div></div></div>
 <script>
-async function refresh(){
- const r=await fetch('/api/status'); const s=await r.json();
- bal.textContent='$'+Number(s.balance).toFixed(6);
- pnl.textContent=(s.profit>=0?'+':'')+'$'+Number(s.profit).toFixed(6);
- cycles.textContent=s.cycles;
- status.textContent=s.running?'RUNNING':'PAUSED';
- last.textContent=s.last?JSON.stringify(s.last):'';
- logs.textContent=s.logs.join('\\n');
-}
-async function toggle(){await fetch('/api/toggle',{method:'POST'});refresh()}
-setInterval(refresh,2000); refresh();
+async function r(){try{let x=await (await fetch('/api/status')).json();
+b.textContent='$'+x.balance.toFixed(8);p.textContent=(x.profit>=0?'+':'')+'$'+x.profit.toFixed(8);
+c.textContent=x.cycles;t.textContent=x.paper_trades;s.textContent=x.running?'● RUNNING':'● PAUSED';
+if(x.best){let z=x.best;o.innerHTML='<b>Best observed route</b><br>'+z.buy+' → '+z.sell+
+'<br>Input: $'+z.input.toFixed(8)+'<br>Gross output: $'+z.gross.toFixed(8)+
+'<br>Estimated net: '+(z.net>=0?'+':'')+'$'+z.net.toFixed(8)+' ('+z.net_pct.toFixed(4)+'%)'}
+q.innerHTML=x.quotes.map(z=>'<tr><td>'+z.dex+'</td><td>'+z.sol.toFixed(9)+'</td><td>'+z.impact+'%</td></tr>').join('');
+l.textContent=x.logs.join('\\n')}catch(e){}}
+async function tog(){await fetch('/api/toggle',{method:'POST'});r()}
+async function res(){await fetch('/api/reset',{method:'POST'});r()}setInterval(r,3000);r();
 </script>
-</body></html>
