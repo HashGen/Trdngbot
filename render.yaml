@@ -6,7 +6,7 @@ services:
     startCommand: gunicorn --bind 0.0.0.0:$PORT app:app
     envVars:
       - key: POLL_SECONDS
-        value: "5"
+        value: "10"
       - key: STARTING_USDC
         value: "1"
       - key: TRADE_FRACTION
@@ -17,3 +17,6 @@ services:
         value: "0.30"
       - key: PAPER_SLIPPAGE_PCT
         value: "0.30"
+      - key: PROBE_USDC
+        value: "1"
+        
