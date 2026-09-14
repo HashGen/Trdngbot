@@ -12,7 +12,7 @@ app = Flask(__name__)
 QUOTE = "https://lite-api.jup.ag/swap/v1/quote"
 SOL = "So11111111111111111111111111111111111111112"
 USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
-DEXES = ["Raydium", "Orca Whirlpool", "Meteora DLMM", "Lifinity"]
+DEXES = ["Raydium", "Orca V2", "Meteora DLMM", "Whirlpool"]
 
 
 def num(key, default):
