@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Solana Arbitrage — Paper Bot</title>
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;background:#0f1115;color:#eee;margin:0}
+.wrap{max-width:900px;margin:auto;padding:24px}
+.card{background:#181b22;border:1px solid #292e38;border-radius:18px;padding:20px;margin:14px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.big{font-size:28px;font-weight:700}.muted{color:#9aa3b2}
+button{border:0;border-radius:12px;padding:12px 18px;background:#eee;color:#111;font-weight:700}
+.log{font-family:monospace;font-size:13px;line-height:1.7;white-space:pre-wrap}
+.warn{border-left:4px solid #e0a800}
+</style>
+</head>
+<body><div class="wrap">
+<h1>Solana Arbitrage — Paper Bot</h1>
+<p class="muted">Educational simulator • no real trades • no private key</p>
+<div class="card warn"><b>⚠️ Paper mode only.</b> This dashboard does not send transactions or spend crypto.</div>
+<div class="grid">
+<div class="card"><div class="muted">Virtual balance</div><div class="big" id="bal">—</div></div>
+<div class="card"><div class="muted">Paper P/L</div><div class="big" id="pnl">—</div></div>
+<div class="card"><div class="muted">Cycles</div><div class="big" id="cycles">—</div></div>
+<div class="card"><div class="muted">Status</div><div class="big" id="status">—</div></div>
+</div>
+<div class="card">
+<button onclick="toggle()">Start / Pause</button>
+<span id="last" class="muted" style="margin-left:12px"></span>
+</div>
+<div class="card"><h3>Activity</h3><div id="logs" class="log"></div></div>
+</div>
+<script>
+async function refresh(){
+ const r=await fetch('/api/status'); const s=await r.json();
+ bal.textContent='$'+Number(s.balance).toFixed(6);
+ pnl.textContent=(s.profit>=0?'+':'')+'$'+Number(s.profit).toFixed(6);
+ cycles.textContent=s.cycles;
+ status.textContent=s.running?'RUNNING':'PAUSED';
+ last.textContent=s.last?JSON.stringify(s.last):'';
+ logs.textContent=s.logs.join('\\n');
+}
+async function toggle(){await fetch('/api/toggle',{method:'POST'});refresh()}
+setInterval(refresh,2000); refresh();
+</script>
+</body></html>
